@@ -1,3 +1,5 @@
+use material_yew::select::ListIndex::Single;
+use material_yew::{select::ListIndex, MatList, MatListItem};
 use serde::Deserialize;
 use yew::{
     format::{Json, Nothing},
@@ -8,12 +10,15 @@ use yew::{
         FetchService,
     },
 };
-use material_yew::{MatList, MatListItem, select::ListIndex};
 
 enum Msg {
+    Error,
     GetList,
-    Action(ListIndex, String),
+    GetImage(String),
+    GetManifest(String, String),
+    ReceiveResponseTags(Result<Tags, anyhow::Error>),
     ReceiveResponse(Result<Repos, anyhow::Error>),
+    ReceiveResponseManifest(Result<String, anyhow::Error>)
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -21,23 +26,64 @@ struct Repos {
     repositories: Vec<String>,
 }
 
-struct RepoList {
+#[derive(Deserialize, Debug, Clone)]
+struct Tags {
+    name: String,
+    tags: Vec<String>,
+}
+
+fn render(item: &String) -> Html {
+    html! {<MatListItem>{ item }</MatListItem>}
+}
+
+fn image_list_callback(val: ListIndex, list: Vec<String>) -> Msg {
+    if let Single(index) = val {
+        Msg::GetImage(list[index.expect("Error ListIndex type")].clone())
+    } else {
+        Msg::Error
+    }
+}
+
+fn image_tags_callback(name: String, val: ListIndex, list: Vec<String>) -> Msg {
+    if let Single(index) = val {
+        Msg::GetManifest(name, list[index.expect("Error ListIndex type")].clone())
+    } else {
+        Msg::Error
+    }
+}
+
+struct Model {
     task: Option<FetchTask>,
     list: Option<Repos>,
     link: ComponentLink<Self>,
     error: Option<String>,
+    tags: Option<Tags>,
+    manifest: Option<String>,
 }
 
-fn render(image: &String) -> Html {
-    html!{<MatListItem>{ image }</MatListItem>}
-}
-
-impl RepoList {
+impl Model {
+    fn view_tags(&self) -> Html {
+        html! {
+                match self.tags.clone() {
+                Some(ref tags) => {
+                    let tags_cp = tags.clone();
+                    html! {<MatList onaction= self.link.callback(move |val| image_tags_callback(tags_cp.name.clone(), val, tags_cp.tags.to_vec()))>
+                        { tags.tags.iter().map(|i| render(i)).collect::<Html>() }
+                    </MatList>}
+                }
+                None => {
+                    html! {
+                    }
+                }
+            }
+        }
+    }
 
     fn view_image_list(&self) -> Html {
         match self.list.clone() {
-            Some(ref list) => {
-                html! {<MatList onaction= self.link.callback(|val| Msg::Action(val, "basic".to_string()))>
+            Some(list) => {
+                let list_cp = list.clone();
+                html! {<MatList onaction= self.link.callback(move |val|  image_list_callback(val, list_cp.repositories.to_vec()))>
                     { list.repositories.iter().map(|i| render(i)).collect::<Html>() }
                 </MatList>}
             }
@@ -51,40 +97,36 @@ impl RepoList {
         }
     }
 
-    fn view_fetching(&self) -> Html {
-        if self.task.is_some() {
-            html! { <p>{ "Fetching data..." }</p> }
-        } else {
-            html! { <p></p> }
-        }
-    }
-
-    fn view_error(&self) -> Html {
-        if let Some(ref error) = self.error {
-            html! { <p>{ error.clone() }</p> }
-        } else {
-            html! {}
+    fn view_infos(&self) -> Html {
+        match self.manifest.clone() {
+            Some(man) => html!{man},
+            None => html!{}
         }
     }
 }
 
-impl Component for RepoList {
+impl Component for Model {
     type Message = Msg;
     type Properties = ();
 
-    fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        Self {
+    fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
+        Model {
             task: None,
-            list: None,
+            tags: None,
             link,
             error: None,
+            list: None,
+            manifest: None,
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::GetList => {
-                let request = Request::get("https://docker.adotmob.com/v2/_catalog?n=20")
+                self.list = None;
+                self.tags = None;
+                self.manifest = None;
+                let request = Request::get("https://docker.adotmob.com/v2/_catalog?n=200")
                     .body(Nothing)
                     .expect("Could not build request");
                 let callback =
@@ -97,9 +139,54 @@ impl Component for RepoList {
                     Some(FetchService::fetch(request, callback).expect("failed to start request"));
                 true
             }
+            Msg::GetImage(img) => {
+                self.tags = None;
+                self.manifest = None;
+                let request =
+                    Request::get(format!("https://docker.adotmob.com/v2/{}/tags/list", img))
+                        .body(Nothing)
+                        .expect("Could not build request");
+                let callback =
+                    self.link
+                        .callback(|response: Response<Json<Result<Tags, anyhow::Error>>>| {
+                            let Json(data) = response.into_body();
+                            Msg::ReceiveResponseTags(data)
+                        });
+                self.task =
+                    Some(FetchService::fetch(request, callback).expect("failed to start request"));
+                true
+            }
+            Msg::GetManifest(img, tag) => {
+                self.manifest = None;
+                let request = Request::get(format!("https://docker.adotmob.com/v2/{}/manifests/{}", img, tag))
+                    .body(Nothing)
+                    .expect("Could not build request");
+                let callback =
+                    self.link
+                        .callback(|response: Response<Result<String, anyhow::Error>>| {
+                            Msg::ReceiveResponseManifest(response.into_body())
+                        });
+                self.task =
+                    Some(FetchService::fetch(request, callback).expect("failed to start request"));
+                true
+            }
             Msg::ReceiveResponse(response) => {
                 if let Ok(res) = response {
                     self.list = Some(res);
+                    return true;
+                };
+                false
+            }
+            Msg::ReceiveResponseTags(response) => {
+                if let Ok(res) = response {
+                    self.tags = Some(res);
+                    return true;
+                };
+                false
+            }
+            Msg::ReceiveResponseManifest(response) => {
+                if let Ok(res) = response {
+                    self.manifest = Some(res);
                     return true;
                 };
                 false
@@ -113,14 +200,16 @@ impl Component for RepoList {
     }
 
     fn view(&self) -> Html {
-        html! {<>
-            {self.view_fetching()}
-            {self.view_image_list()}
-            {self.view_error()}
-        </>}
+        html! {
+            <div class="flexWrap">
+                <div class="flexCol">{self.view_image_list()}</div>
+                <div class="flexCol">{self.view_tags()}</div>
+                <div class="flexCol">{self.view_infos()}</div>
+            </div>
+        }
     }
 }
 
 fn main() {
-    yew::start_app::<RepoList>();
+    yew::start_app::<Model>();
 }
