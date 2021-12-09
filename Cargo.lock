@@ -1747,13 +1747,16 @@ dependencies = [
  "anyhow",
  "cached",
  "serde",
+ "shipyard-ui",
 ]
 
 [[package]]
 name = "shipyard-frontend"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "material-yew",
+ "shipyard-ui",
  "yew",
 ]
 

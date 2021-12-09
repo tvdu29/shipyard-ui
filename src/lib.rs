@@ -32,11 +32,20 @@ mod frontend;
 
 #[cfg(feature = "frontend")]
 pub use frontend::components::root::RootComponent;
+use serde::Deserialize;
 
-pub mod protocol_capnp {
-    #![allow(dead_code)]
-    #![allow(missing_docs)]
-    #![allow(unknown_lints)]
-    #![allow(clippy)]
-    include!(concat!(env!("OUT_DIR"), "/src/protocol_capnp.rs"));
+/// struct to parse /_catalog requests to
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct Repos {
+    /// list of image names
+    pub repositories: Vec<String>,
+}
+
+/// struct to parse /tags requests to
+#[derive(Deserialize, Debug, Clone)]
+pub struct Tags {
+    /// name of the image
+    pub name: String,
+    /// list of tags for specified image
+    pub tags: Vec<String>,
 }

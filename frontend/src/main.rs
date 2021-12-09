@@ -1,6 +1,5 @@
 use material_yew::select::ListIndex::Single;
 use material_yew::{select::ListIndex, MatList, MatListItem};
-use serde::Deserialize;
 use yew::{
     format::{Json, Nothing},
     prelude::*,
@@ -10,6 +9,8 @@ use yew::{
         FetchService,
     },
 };
+use shipyard::{Repos, Tags};
+use anyhow;
 
 enum Msg {
     Error,
@@ -19,17 +20,6 @@ enum Msg {
     ReceiveResponseTags(Result<Tags, anyhow::Error>),
     ReceiveResponse(Result<Repos, anyhow::Error>),
     ReceiveResponseManifest(Result<String, anyhow::Error>)
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct Repos {
-    repositories: Vec<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-struct Tags {
-    name: String,
-    tags: Vec<String>,
 }
 
 fn render(item: &String) -> Html {
