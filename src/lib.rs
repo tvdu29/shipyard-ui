@@ -42,7 +42,7 @@ pub struct Repos {
 }
 
 /// struct to parse /tags requests to
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 pub struct Tags {
     /// name of the image
     pub name: String,

@@ -13,6 +13,8 @@ actix-web = { version = "3.3.2", features = ["openssl"] }
 cached = "0.26"
 anyhow = "1.0"
 serde = "1.0"
+redis = "0.21.4"
+itertools = "0.10.3"
 shipyard-ui = { version = "0.1.0", path = ".."}
 
 [[bin]]

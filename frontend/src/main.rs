@@ -46,7 +46,6 @@ struct Model {
     task: Option<FetchTask>,
     list: Option<Repos>,
     link: ComponentLink<Self>,
-    error: Option<String>,
     tags: Option<Tags>,
     manifest: Option<String>,
 }
@@ -104,7 +103,6 @@ impl Component for Model {
             task: None,
             tags: None,
             link,
-            error: None,
             list: None,
             manifest: None,
         }
