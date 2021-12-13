@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use actix_cors::Cors;
 use actix_web::{client::ClientBuilder, get, web, App, HttpResponse, HttpServer};
 use itertools::Itertools;
 use redis::{Client, Commands};
@@ -13,7 +14,6 @@ async fn req_list_images(
     page_size: usize,
     redis: MutexGuard<'_, Client>,
 ) -> Result<usize, anyhow::Error> {
-    println!("req_list_images");
     let mut res_repos = Repos::default();
     let url = format!(
         "{}/_catalog",
@@ -119,8 +119,10 @@ async fn list_images_page(
                         .query(&mut con)
                     {
                         Ok(vec) => {
-                            let vec: Vec<String> = vec;
-                            HttpResponse::Ok().body(vec.join(","))
+                            let repos = Repos {
+                                repositories: vec,
+                            };
+                            HttpResponse::Ok().body(serde_json::to_string(&repos).expect("Failed to serialize response"))
                         }
                         Err(e) => HttpResponse::InternalServerError()
                             .body(format!("Failed to request page: {}", e)),
@@ -189,7 +191,7 @@ async fn get_manifest(web::Path(image): web::Path<String>) -> HttpResponse {
             HttpResponse::InternalServerError().body(format!("Failed to request manifest: {}", e))
         }
         Ok(mut manifest) => match manifest.body().await {
-            Ok(tags) => HttpResponse::Ok().body(format!("{:#?}", std::str::from_utf8(&tags).expect("Failed to parse manifest").to_string())),
+            Ok(tags) => HttpResponse::Ok().body(format!("{}", std::str::from_utf8(&tags).expect("Failed to parse manifest").to_string())),
             Err(e) => {
                 HttpResponse::InternalServerError().body(format!("Failed to parse tags: {}", e))
             }
@@ -214,7 +216,7 @@ async fn main() -> io::Result<()> {
         .expect("Failed to fetch images at startup");
     println!("start api...");
     HttpServer::new(move || {
-        App::new().app_data(web::Data::new(client.clone())).service(
+        App::new().app_data(web::Data::new(client.clone())).wrap(Cors::permissive()).service(
             web::scope("/v2")
                 .service(list_images_page)
                 .service(refresh_catalog)

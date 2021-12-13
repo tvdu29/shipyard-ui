@@ -1789,6 +1789,7 @@ dependencies = [
  "itertools",
  "redis",
  "serde",
+ "serde_json",
  "shipyard-ui",
 ]
 

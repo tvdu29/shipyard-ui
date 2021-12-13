@@ -114,9 +114,10 @@ impl Component for Model {
                 self.list = None;
                 self.tags = None;
                 self.manifest = None;
-                let request = Request::get("https://docker.adotmob.com/v2/_catalog?n=200")
+                let request = Request::get("http://127.0.0.1:8080/v2/catalog/1")
                     .body(Nothing)
                     .expect("Could not build request");
+                println!("callback");
                 let callback =
                     self.link
                         .callback(|response: Response<Json<Result<Repos, anyhow::Error>>>| {
@@ -131,7 +132,7 @@ impl Component for Model {
                 self.tags = None;
                 self.manifest = None;
                 let request =
-                    Request::get(format!("https://docker.adotmob.com/v2/{}/tags/list", img))
+                    Request::get(format!("http://127.0.0.1:8080/v2/tags/{}", img))
                         .body(Nothing)
                         .expect("Could not build request");
                 let callback =
@@ -146,7 +147,7 @@ impl Component for Model {
             }
             Msg::GetManifest(img, tag) => {
                 self.manifest = None;
-                let request = Request::get(format!("https://docker.adotmob.com/v2/{}/manifests/{}", img, tag))
+                let request = Request::get(format!("http://127.0.0.1:8080/v2/manifests/{}:{}", img, tag))
                     .body(Nothing)
                     .expect("Could not build request");
                 let callback =

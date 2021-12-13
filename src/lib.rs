@@ -32,17 +32,17 @@ mod frontend;
 
 #[cfg(feature = "frontend")]
 pub use frontend::components::root::RootComponent;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// struct to parse /_catalog requests to
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Repos {
     /// list of image names
     pub repositories: Vec<String>,
 }
 
 /// struct to parse /tags requests to
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Tags {
     /// name of the image
     pub name: String,
