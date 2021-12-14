@@ -10,3 +10,4 @@ yew = "0.18"
 material-yew = {version = "0.1.0", features = ["full"]}
 shipyard-ui = { version = "0.1.0", path = ".."}
 anyhow = "1.0.51"
+serde_json = "1.0"

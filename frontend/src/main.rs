@@ -9,8 +9,8 @@ use yew::{
         FetchService,
     },
 };
-use shipyard::{Repos, Tags};
-use anyhow;
+use shipyard::{Repos, Tags, DockerManifest};
+use anyhow::{self, Error};
 
 enum Msg {
     Error,
@@ -19,7 +19,7 @@ enum Msg {
     GetManifest(String, String),
     ReceiveResponseTags(Result<Tags, anyhow::Error>),
     ReceiveResponse(Result<Repos, anyhow::Error>),
-    ReceiveResponseManifest(Result<String, anyhow::Error>)
+    ReceiveResponseManifest(Result<DockerManifest, anyhow::Error>)
 }
 
 fn render(item: &String) -> Html {
@@ -47,7 +47,8 @@ struct Model {
     list: Option<Repos>,
     link: ComponentLink<Self>,
     tags: Option<Tags>,
-    manifest: Option<String>,
+    manifest: Option<DockerManifest>,
+    error: Option<Error>,
 }
 
 impl Model {
@@ -87,10 +88,17 @@ impl Model {
     }
 
     fn view_infos(&self) -> Html {
-        match self.manifest.clone() {
-            Some(man) => html!{man},
-            None => html!{}
+        match &self.error {
+            Some(e) => html!{e},
+            None => match self.manifest.clone() {
+                Some(man) => match serde_json::to_string_pretty(&man) {
+                    Ok(js) => html!{js},
+                    Err(_e) => html!{"plop"},
+                },
+                None => html!{"lol"}
+            }
         }
+        
     }
 }
 
@@ -105,6 +113,7 @@ impl Component for Model {
             link,
             list: None,
             manifest: None,
+            error: None,
         }
     }
 
@@ -129,6 +138,7 @@ impl Component for Model {
                 true
             }
             Msg::GetImage(img) => {
+                let img = img.replace("/", "%2F");
                 self.tags = None;
                 self.manifest = None;
                 let request =
@@ -146,14 +156,16 @@ impl Component for Model {
                 true
             }
             Msg::GetManifest(img, tag) => {
+                let img = img.replace("/", "%2F");
                 self.manifest = None;
-                let request = Request::get(format!("http://127.0.0.1:8080/v2/manifests/{}:{}", img, tag))
+                let request = Request::get(format!("http://127.0.0.1:8080/v2/manifest/{}:{}", img, tag))
                     .body(Nothing)
                     .expect("Could not build request");
                 let callback =
                     self.link
-                        .callback(|response: Response<Result<String, anyhow::Error>>| {
-                            Msg::ReceiveResponseManifest(response.into_body())
+                        .callback(|response: Response<Json<Result<SchemaVersion, anyhow::Error>>>| {
+                            let Json(data) = response.into_body();
+                            Msg::ReceiveResponseManifest(data)
                         });
                 self.task =
                     Some(FetchService::fetch(request, callback).expect("failed to start request"));
@@ -174,11 +186,11 @@ impl Component for Model {
                 false
             }
             Msg::ReceiveResponseManifest(response) => {
-                if let Ok(res) = response {
-                    self.manifest = Some(res);
-                    return true;
-                };
-                false
+                match response {
+                    Ok(res) => {self.manifest = Some(res);
+                        return true;},
+                    Err(e) => {self.error = Some(e); return true;},
+                }
             }
             _ => false,
         }
@@ -191,9 +203,9 @@ impl Component for Model {
     fn view(&self) -> Html {
         html! {
             <div class="flexWrap">
-                <div class="flexCol">{self.view_image_list()}</div>
-                <div class="flexCol">{self.view_tags()}</div>
-                <div class="flexCol">{self.view_infos()}</div>
+                <div class="flexCol scroll">{self.view_image_list()}</div>
+                <div class="flexCol scroll">{self.view_tags()}</div>
+                <div class="flexCol scroll_manifest">{self.view_infos()}</div>
             </div>
         }
     }

@@ -111,18 +111,21 @@ async fn list_images_page(
                         ));
                     };
                     match redis::cmd("SORT")
-                        .arg("catalog")
-                        .arg("alpha")
-                        .arg("limit")
-                        .arg(((card / page_size * (page - 1)) as usize).to_string())
-                        .arg(page_size.to_string())
+                        .arg(&[
+                            "catalog",
+                            "alpha",
+                            "limit",
+                            ((card / page_size * (page - 1)) as usize).to_string().as_ref(),
+                            page_size.to_string().as_ref(),
+                        ])
                         .query(&mut con)
                     {
                         Ok(vec) => {
-                            let repos = Repos {
-                                repositories: vec,
-                            };
-                            HttpResponse::Ok().body(serde_json::to_string(&repos).expect("Failed to serialize response"))
+                            let repos = Repos { repositories: vec };
+                            HttpResponse::Ok().body(
+                                serde_json::to_string(&repos)
+                                    .expect("Failed to serialize response"),
+                            )
                         }
                         Err(e) => HttpResponse::InternalServerError()
                             .body(format!("Failed to request page: {}", e)),
@@ -157,7 +160,8 @@ async fn list_tags(web::Path(image): web::Path<String>) -> HttpResponse {
             HttpResponse::InternalServerError().body(format!("Failed to request tags: {}", e))
         }
         Ok(mut tags) => match tags.json::<Tags>().await {
-            Ok(tags) => HttpResponse::Ok().body(tags.tags.join(",")),
+            Ok(tags) => HttpResponse::Ok()
+                .body(serde_json::to_string(&tags).expect("Failed to serialize response")),
             Err(e) => {
                 HttpResponse::InternalServerError().body(format!("Failed to parse tags: {}", e))
             }
@@ -182,6 +186,10 @@ async fn get_manifest(web::Path(image): web::Path<String>) -> HttpResponse {
     );
     match ClientBuilder::new()
         .timeout(Duration::from_secs(60))
+        .header(
+            "Accept",
+            "application/vnd.docker.distribution.manifest.list.v2+json",
+        )
         .finish()
         .get(url)
         .send()
@@ -191,7 +199,12 @@ async fn get_manifest(web::Path(image): web::Path<String>) -> HttpResponse {
             HttpResponse::InternalServerError().body(format!("Failed to request manifest: {}", e))
         }
         Ok(mut manifest) => match manifest.body().await {
-            Ok(tags) => HttpResponse::Ok().body(format!("{}", std::str::from_utf8(&tags).expect("Failed to parse manifest").to_string())),
+            Ok(tags) => HttpResponse::Ok().body(format!(
+                "{}",
+                std::str::from_utf8(&tags)
+                    .expect("Failed to parse manifest")
+                    .to_string()
+            )),
             Err(e) => {
                 HttpResponse::InternalServerError().body(format!("Failed to parse tags: {}", e))
             }
@@ -216,13 +229,16 @@ async fn main() -> io::Result<()> {
         .expect("Failed to fetch images at startup");
     println!("start api...");
     HttpServer::new(move || {
-        App::new().app_data(web::Data::new(client.clone())).wrap(Cors::permissive()).service(
-            web::scope("/v2")
-                .service(list_images_page)
-                .service(refresh_catalog)
-                .service(list_tags)
-                .service(get_manifest),
-        )
+        App::new()
+            .app_data(web::Data::new(client.clone()))
+            .wrap(Cors::permissive())
+            .service(
+                web::scope("/v2")
+                    .service(list_images_page)
+                    .service(refresh_catalog)
+                    .service(list_tags)
+                    .service(get_manifest),
+            )
     })
     .bind(format!(
         "{}:{}",
