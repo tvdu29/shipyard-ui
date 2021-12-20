@@ -23,8 +23,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt update -y && \
     python3 -m pip install supervisor;
 
 COPY --from=build /usr/local/cargo/bin/backend /usr/local/cargo/bin/backend
+COPY --from=build /frontend/dist /dist
 
-COPY nginx.conf /etc/nginx/sites-enabled/front.conf
+COPY nginx.conf /etc/nginx/sites-enabled/default
 
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 

@@ -243,7 +243,7 @@ async fn main() -> io::Result<()> {
     .bind(format!(
         "{}:{}",
         env::var("SHIPYARD_URL").unwrap_or("127.0.0.1".to_string()),
-        env::var("SHIPYARD_PORT").unwrap_or("8080".to_string())
+        env::var("SHIPYARD_PORT").unwrap_or("81".to_string())
     ))?
     .run()
     .await
