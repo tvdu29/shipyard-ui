@@ -1,5 +1,8 @@
+use anyhow::{self, Error};
 use material_yew::select::ListIndex::Single;
 use material_yew::{select::ListIndex, MatList, MatListItem};
+use shipyard::{get_manifest, DockerManifest, Repos, Tags};
+use yew::services::ConsoleService;
 use yew::{
     format::{Json, Nothing},
     prelude::*,
@@ -9,8 +12,6 @@ use yew::{
         FetchService,
     },
 };
-use shipyard::{Repos, Tags, DockerManifest};
-use anyhow::{self, Error};
 
 enum Msg {
     Error,
@@ -19,7 +20,7 @@ enum Msg {
     GetManifest(String, String),
     ReceiveResponseTags(Result<Tags, anyhow::Error>),
     ReceiveResponse(Result<Repos, anyhow::Error>),
-    ReceiveResponseManifest(Result<DockerManifest, anyhow::Error>)
+    ReceiveResponseManifest(Result<DockerManifest, anyhow::Error>),
 }
 
 fn render(item: &String) -> Html {
@@ -89,16 +90,20 @@ impl Model {
 
     fn view_infos(&self) -> Html {
         match &self.error {
-            Some(e) => html!{e},
+            Some(e) => html! {e},
             None => match self.manifest.clone() {
-                Some(man) => match serde_json::to_string_pretty(&man) {
-                    Ok(js) => html!{js},
-                    Err(_e) => html!{"plop"},
+                Some(man) => match man {
+                    DockerManifest::V1(man) => html! {<MatList>
+                        { render(&format!("V1 {}", &man.architecture)) }
+                    </MatList> },
+                    DockerManifest::V2(_) => html! {},
+                    DockerManifest::V2List(man) => html! {<MatList>
+                        { man.manifests.unwrap().iter().map(|i| render(&format!("V2 {}/{}",i.platform.clone().unwrap().os , i.platform.clone().unwrap().architecture))).collect::<Html>() }
+                    </MatList> },
                 },
-                None => html!{"lol"}
-            }
+                None => html! {<p>{"Select image and tag"}</p>},
+            },
         }
-        
     }
 }
 
@@ -123,10 +128,11 @@ impl Component for Model {
                 self.list = None;
                 self.tags = None;
                 self.manifest = None;
-                let request = Request::get("http://127.0.0.1:8080/v2/catalog/1")
-                    .body(Nothing)
-                    .expect("Could not build request");
-                println!("callback");
+                let request = match Request::get("http://127.0.0.1:8080/v2/catalog/1")
+                    .body(Nothing) {
+                        Ok(r) => r,
+                        Err(e) => {ConsoleService::error(&format!("failed to initialize request: {}", e)); return false},
+                    };
                 let callback =
                     self.link
                         .callback(|response: Response<Json<Result<Repos, anyhow::Error>>>| {
@@ -141,10 +147,9 @@ impl Component for Model {
                 let img = img.replace("/", "%2F");
                 self.tags = None;
                 self.manifest = None;
-                let request =
-                    Request::get(format!("http://127.0.0.1:8080/v2/tags/{}", img))
-                        .body(Nothing)
-                        .expect("Could not build request");
+                let request = Request::get(format!("http://127.0.0.1:8080/v2/tags/{}", img))
+                    .body(Nothing)
+                    .expect("Could not build request");
                 let callback =
                     self.link
                         .callback(|response: Response<Json<Result<Tags, anyhow::Error>>>| {
@@ -158,15 +163,26 @@ impl Component for Model {
             Msg::GetManifest(img, tag) => {
                 let img = img.replace("/", "%2F");
                 self.manifest = None;
-                let request = Request::get(format!("http://127.0.0.1:8080/v2/manifest/{}:{}", img, tag))
-                    .body(Nothing)
-                    .expect("Could not build request");
+                let request =
+                    Request::get(format!("http://127.0.0.1:8080/v2/manifest/{}:{}", img, tag))
+                        .body(Nothing)
+                        .expect("Could not build request");
                 let callback =
                     self.link
-                        .callback(|response: Response<Json<Result<SchemaVersion, anyhow::Error>>>| {
-                            let Json(data) = response.into_body();
-                            Msg::ReceiveResponseManifest(data)
-                        });
+                        .callback(
+                            |response: Response<Result<String, anyhow::Error>>| match response
+                                .into_body()
+                            {
+                                Ok(data) => Msg::ReceiveResponseManifest(get_manifest(&data)),
+                                Err(e) => {
+                                    ConsoleService::error(&format!(
+                                        "failed to parse response body: {}",
+                                        e
+                                    ));
+                                    Msg::Error
+                                }
+                            },
+                        );
                 self.task =
                     Some(FetchService::fetch(request, callback).expect("failed to start request"));
                 true
@@ -185,13 +201,16 @@ impl Component for Model {
                 };
                 false
             }
-            Msg::ReceiveResponseManifest(response) => {
-                match response {
-                    Ok(res) => {self.manifest = Some(res);
-                        return true;},
-                    Err(e) => {self.error = Some(e); return true;},
+            Msg::ReceiveResponseManifest(response) => match response {
+                Ok(res) => {
+                    self.manifest = Some(res);
+                    return true;
                 }
-            }
+                Err(e) => {
+                    self.error = Some(e);
+                    return true;
+                }
+            },
             _ => false,
         }
     }

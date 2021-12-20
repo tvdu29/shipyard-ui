@@ -91,8 +91,10 @@ pub struct SchemaVersion {
 #[serde(rename_all = "camelCase")]
 ///struct for manifest v2 config
 pub struct ManifestV2ListPlatform {
-    architecture: String,
-    os: String,
+    ///contain cpu arch
+    pub architecture: String,
+    ///contains os
+    pub os: String,
     variant: Option<String>,
     features: Option<Vec<String>>
 }
@@ -105,7 +107,8 @@ pub struct ManifestConfig {
     media_type: String,
     size: usize,
     digest: String,
-    platform: Option<ManifestV2ListPlatform>
+    /// contains platform specific info
+    pub platform: Option<ManifestV2ListPlatform>
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -124,15 +127,23 @@ pub struct ErrorsV2{
     detail: ErrorsV2Detail,
 }
 
+/// struct to parse `fsLayers` v1 to
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LayerV1{
+    blob_sum: String
+}
+
 /// struct to parse `/manifest` v1 requests to
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest{
     name: String,
     tag: String,
-    architecture: String,
-    fs_layers: Vec<String>,
-    history: Vec<String>
+    ///cpu architecture
+    pub architecture: String,
+    //fs_layers: Vec<LayerV1>,
+    //history: Vec<String>
 }
 
 /// struct to parse `/manifest` v2 requests to
@@ -140,7 +151,8 @@ pub struct Manifest{
 #[serde(rename_all = "camelCase")]
 pub struct ManifestV2{
     media_type: Option<String>,
-    manifests: Option<ManifestConfig>,
+    ///list of sub manifests
+    pub manifests: Option<Vec<ManifestConfig>>,
     layers: Option<Vec<ManifestConfig>>,
 }
 
@@ -149,7 +161,6 @@ pub struct ManifestV2{
 #[serde(rename_all = "camelCase")]
 pub struct ManifestV2List{
     media_type: Option<String>,
-    config: Option<ManifestConfig>,
-    layers: Option<Vec<ManifestConfig>>,
-    errors: Option<ErrorsV2>
+    ///list of sub manifests
+    pub manifests: Option<Vec<ManifestConfig>>,
 }
