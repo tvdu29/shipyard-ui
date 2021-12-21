@@ -19,13 +19,15 @@ RUN rustup run nightly trunk build --release /frontend/index.html && \
 FROM rust:buster as run
 
 RUN DEBIAN_FRONTEND=noninteractive apt update -y && \
-    DEBIAN_FRONTEND=noninteractive apt install python3-pip apt-utils nginx -y && \
+    DEBIAN_FRONTEND=noninteractive apt install python3-pip apt-utils nginx redis-server -y && \
     python3 -m pip install supervisor;
 
 COPY --from=build /usr/local/cargo/bin/backend /usr/local/cargo/bin/backend
 COPY --from=build /frontend/dist /dist
 
-COPY nginx.conf /etc/nginx/sites-enabled/default
+COPY mime.types /etc/nginx/mime.types
+
+COPY nginx.conf /etc/nginx/nginx.conf
 
 COPY supervisord.conf /etc/supervisor/supervisord.conf
 

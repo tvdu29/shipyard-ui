@@ -128,7 +128,7 @@ impl Component for Model {
                 self.list = None;
                 self.tags = None;
                 self.manifest = None;
-                let request = match Request::get("http://127.0.0.1:8080/v2/catalog/1")
+                let request = match Request::get("http://127.0.0.1:8081/v2/catalog/1")
                     .body(Nothing) {
                         Ok(r) => r,
                         Err(e) => {ConsoleService::error(&format!("failed to initialize request: {}", e)); return false},
@@ -147,7 +147,7 @@ impl Component for Model {
                 let img = img.replace("/", "%2F");
                 self.tags = None;
                 self.manifest = None;
-                let request = Request::get(format!("http://127.0.0.1:8080/v2/tags/{}", img))
+                let request = Request::get(format!("http://127.0.0.1:8081/v2/tags/{}", img))
                     .body(Nothing)
                     .expect("Could not build request");
                 let callback =
@@ -164,7 +164,7 @@ impl Component for Model {
                 let img = img.replace("/", "%2F");
                 self.manifest = None;
                 let request =
-                    Request::get(format!("http://127.0.0.1:8080/v2/manifest/{}:{}", img, tag))
+                    Request::get(format!("http://127.0.0.1:8081/v2/manifest/{}:{}", img, tag))
                         .body(Nothing)
                         .expect("Could not build request");
                 let callback =
